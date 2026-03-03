@@ -47,8 +47,9 @@ type model struct {
 	box   boxModel
 	topic topicModel
 
-	loading bool
-	err     error
+	loading  bool
+	err      error
+	lastKey  string // debug: last key event received
 }
 
 func newModel(c *client.Client) model {
@@ -78,6 +79,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyPressMsg:
+		m.lastKey = fmt.Sprintf("key=%q code=0x%x mod=%d", msg.String(), msg.Key().Code, msg.Key().Mod)
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -119,14 +121,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *model) updateBoxes(msg tea.Msg) tea.Cmd {
 	if msg, ok := msg.(tea.KeyPressMsg); ok {
-		switch msg.String() {
-		case "enter":
-			if m.boxes.list.FilterState() != list.Filtering {
-				box := m.boxes.selectedBox()
-				if box != nil {
-					m.loading = true
-					return m.fetchBox(box.ID)
-				}
+		if msg.Key().Code == tea.KeyEnter && m.boxes.list.FilterState() != list.Filtering {
+			box := m.boxes.selectedBox()
+			if box != nil {
+				m.loading = true
+				return m.fetchBox(box.ID)
 			}
 		}
 	}
@@ -138,13 +137,13 @@ func (m *model) updateBoxes(msg tea.Msg) tea.Cmd {
 
 func (m *model) updateBox(msg tea.Msg) tea.Cmd {
 	if msg, ok := msg.(tea.KeyPressMsg); ok {
-		switch msg.String() {
-		case "esc", "backspace":
+		switch msg.Key().Code {
+		case tea.KeyEscape, tea.KeyBackspace:
 			if m.box.list.FilterState() == list.Unfiltered {
 				m.state = viewBoxes
 				return nil
 			}
-		case "enter":
+		case tea.KeyEnter:
 			if m.box.list.FilterState() != list.Filtering {
 				posting := m.box.selectedPosting()
 				if posting != nil && posting.Topic != nil {
@@ -162,13 +161,15 @@ func (m *model) updateBox(msg tea.Msg) tea.Cmd {
 
 func (m *model) updateTopic(msg tea.Msg) tea.Cmd {
 	if msg, ok := msg.(tea.KeyPressMsg); ok {
-		switch msg.String() {
-		case "esc", "backspace":
+		switch msg.Key().Code {
+		case tea.KeyEscape, tea.KeyBackspace:
 			m.state = viewBox
 			return nil
-		case "q":
-			m.state = viewBox
-			return nil
+		default:
+			if msg.String() == "q" {
+				m.state = viewBox
+				return nil
+			}
 		}
 	}
 
@@ -193,6 +194,10 @@ func (m model) View() tea.View {
 		case viewTopic:
 			content = m.topic.view()
 		}
+	}
+
+	if m.lastKey != "" {
+		content = content + "\n\n[DEBUG] last key: " + m.lastKey
 	}
 
 	v := tea.NewView(content)

@@ -38,6 +38,8 @@ func (c *Client) doRequest(method, path string, body io.Reader, contentType stri
 
 	if c.Config.AccessToken != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Config.AccessToken)
+	} else if c.Config.SessionCookie != "" {
+		req.Header.Set("Cookie", "session_token="+c.Config.SessionCookie)
 	}
 	req.Header.Set("Accept", "application/json")
 	if contentType != "" {
@@ -49,10 +51,9 @@ func (c *Client) doRequest(method, path string, body io.Reader, contentType stri
 		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
-	if resp.StatusCode == 401 && c.Config.RefreshToken != "" {
+	if resp.StatusCode == 401 && c.Config.RefreshToken != "" && c.Config.AccessToken != "" {
 		resp.Body.Close()
 		if err := c.refreshToken(); err == nil {
-			// Retry with new token
 			req, _ = http.NewRequest(method, reqURL, body)
 			req.Header.Set("Authorization", "Bearer "+c.Config.AccessToken)
 			req.Header.Set("Accept", "application/json")

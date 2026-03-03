@@ -13,15 +13,35 @@ type postingItem struct {
 	posting models.Posting
 }
 
-func (i postingItem) Title() string { return i.posting.Summary }
+func (i postingItem) Title() string {
+	title := i.posting.Summary
+	if title == "" && i.posting.Topic != nil {
+		title = i.posting.Topic.Name
+	}
+	if title == "" {
+		title = i.posting.Creator.Name
+	}
+	if !i.posting.Seen {
+		return "● " + title
+	}
+	return "  " + title
+}
 func (i postingItem) Description() string {
 	date := ""
 	if len(i.posting.CreatedAt) >= 10 {
 		date = i.posting.CreatedAt[:10]
 	}
-	return fmt.Sprintf("%s · %s", i.posting.Creator.Name, date)
+	return fmt.Sprintf("  %s · %s", i.posting.Creator.Name, date)
 }
-func (i postingItem) FilterValue() string { return i.posting.Summary }
+func (i postingItem) FilterValue() string {
+	if i.posting.Summary != "" {
+		return i.posting.Summary
+	}
+	if i.posting.Topic != nil {
+		return i.posting.Topic.Name
+	}
+	return i.posting.Creator.Name
+}
 
 type boxModel struct {
 	list list.Model

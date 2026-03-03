@@ -11,13 +11,14 @@ const configDir = ".config/hey-cli"
 const configFile = "config.json"
 
 type Config struct {
-	BaseURL      string `json:"base_url"`
-	AccessToken  string `json:"access_token,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	TokenExpiry  int64  `json:"token_expiry,omitempty"`
-	ClientID     string `json:"client_id,omitempty"`
-	ClientSecret string `json:"client_secret,omitempty"`
-	InstallID    string `json:"install_id,omitempty"`
+	BaseURL       string `json:"base_url"`
+	AccessToken   string `json:"access_token,omitempty"`
+	RefreshToken  string `json:"refresh_token,omitempty"`
+	TokenExpiry   int64  `json:"token_expiry,omitempty"`
+	ClientID      string `json:"client_id,omitempty"`
+	ClientSecret  string `json:"client_secret,omitempty"`
+	InstallID     string `json:"install_id,omitempty"`
+	SessionCookie string `json:"session_cookie,omitempty"`
 }
 
 func configPath() (string, error) {
@@ -38,7 +39,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{
-				BaseURL: "http://app.hey.localhost:3003",
+				BaseURL: "https://app.hey.com",
 			}, nil
 		}
 		return nil, fmt.Errorf("could not read config: %w", err)
@@ -49,7 +50,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("could not parse config: %w", err)
 	}
 	if cfg.BaseURL == "" {
-		cfg.BaseURL = "http://app.hey.localhost:3003"
+		cfg.BaseURL = "https://app.hey.com"
 	}
 	return &cfg, nil
 }
@@ -87,5 +88,5 @@ func (c *Config) Clear() error {
 }
 
 func (c *Config) IsLoggedIn() bool {
-	return c.AccessToken != ""
+	return c.AccessToken != "" || c.SessionCookie != ""
 }

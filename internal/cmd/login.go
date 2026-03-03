@@ -15,6 +15,7 @@ import (
 type loginCommand struct {
 	cmd          *cobra.Command
 	token        string
+	cookie       string
 	clientID     string
 	clientSecret string
 	installID    string
@@ -27,12 +28,14 @@ func newLoginCommand() *loginCommand {
 		Short: "Authenticate with the HEY server",
 		Long: `Authenticate with the HEY server.
 
-Use --token to paste a pre-generated Bearer token (e.g. from generate_oauth_token.rb).
-Without --token, performs interactive OAuth password grant (requires --client-id and --client-secret).`,
+Use --cookie to paste the session_token cookie value from your browser.
+Use --token to paste a pre-generated Bearer token.
+Without either, performs interactive OAuth password grant (requires --client-id and --client-secret).`,
 		RunE: loginCommand.run,
 	}
 
 	loginCommand.cmd.Flags().StringVar(&loginCommand.token, "token", "", "Pre-generated Bearer token")
+	loginCommand.cmd.Flags().StringVar(&loginCommand.cookie, "cookie", "", "Session cookie value from browser (session_token)")
 	loginCommand.cmd.Flags().StringVar(&loginCommand.clientID, "client-id", "", "OAuth client ID")
 	loginCommand.cmd.Flags().StringVar(&loginCommand.clientSecret, "client-secret", "", "OAuth client secret")
 	loginCommand.cmd.Flags().StringVar(&loginCommand.installID, "install-id", "", "Installation ID (default: hey-cli)")
@@ -47,6 +50,15 @@ func (c *loginCommand) run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("could not save config: %w", err)
 		}
 		fmt.Println("Logged in with token.")
+		return nil
+	}
+
+	if c.cookie != "" {
+		cfg.SessionCookie = c.cookie
+		if err := cfg.Save(); err != nil {
+			return fmt.Errorf("could not save config: %w", err)
+		}
+		fmt.Println("Logged in with session cookie.")
 		return nil
 	}
 

@@ -74,8 +74,8 @@ func testEntries() []models.Entry {
 	}
 }
 
-func keyPress(key string) tea.KeyPressMsg {
-	switch key {
+func keyPress(k string) tea.KeyPressMsg {
+	switch k {
 	case "enter":
 		return tea.KeyPressMsg(tea.Key{Code: tea.KeyEnter})
 	case "esc":
@@ -85,9 +85,8 @@ func keyPress(key string) tea.KeyPressMsg {
 	case "ctrl+c":
 		return tea.KeyPressMsg(tea.Key{Code: 'c', Mod: tea.ModCtrl})
 	default:
-		// Single character keys
-		r := rune(key[0])
-		return tea.KeyPressMsg(tea.Key{Code: r, Text: key})
+		r := rune(k[0])
+		return tea.KeyPressMsg(tea.Key{Code: r, Text: k})
 	}
 }
 
@@ -117,9 +116,36 @@ func TestBoxItemFilterValue(t *testing.T) {
 // --- postingItem tests ---
 
 func TestPostingItemTitle(t *testing.T) {
-	item := postingItem{posting: models.Posting{Summary: "Hello world"}}
-	if got := item.Title(); got != "Hello world" {
-		t.Errorf("Title() = %q, want %q", got, "Hello world")
+	item := postingItem{posting: models.Posting{Summary: "Hello world", Seen: true}}
+	if got := item.Title(); got != "  Hello world" {
+		t.Errorf("Title() = %q, want %q", got, "  Hello world")
+	}
+}
+
+func TestPostingItemTitleUnread(t *testing.T) {
+	item := postingItem{posting: models.Posting{Summary: "New mail", Seen: false}}
+	if got := item.Title(); got != "● New mail" {
+		t.Errorf("Title() = %q, want %q", got, "● New mail")
+	}
+}
+
+func TestPostingItemTitleFallbackToTopic(t *testing.T) {
+	item := postingItem{posting: models.Posting{
+		Seen:  true,
+		Topic: &models.Topic{Name: "Topic Name"},
+	}}
+	if got := item.Title(); got != "  Topic Name" {
+		t.Errorf("Title() = %q, want %q", got, "  Topic Name")
+	}
+}
+
+func TestPostingItemTitleFallbackToCreator(t *testing.T) {
+	item := postingItem{posting: models.Posting{
+		Seen:    true,
+		Creator: models.Contact{Name: "Alice"},
+	}}
+	if got := item.Title(); got != "  Alice" {
+		t.Errorf("Title() = %q, want %q", got, "  Alice")
 	}
 }
 
@@ -129,8 +155,8 @@ func TestPostingItemDescription(t *testing.T) {
 		Creator:   models.Contact{Name: "Alice"},
 	}}
 	got := item.Description()
-	if got != "Alice · 2025-01-15" {
-		t.Errorf("Description() = %q, want %q", got, "Alice · 2025-01-15")
+	if got != "  Alice · 2025-01-15" {
+		t.Errorf("Description() = %q, want %q", got, "  Alice · 2025-01-15")
 	}
 }
 
@@ -140,8 +166,8 @@ func TestPostingItemDescriptionShortDate(t *testing.T) {
 		Creator:   models.Contact{Name: "Bob"},
 	}}
 	got := item.Description()
-	if got != "Bob · " {
-		t.Errorf("Description() = %q, want %q", got, "Bob · ")
+	if got != "  Bob · " {
+		t.Errorf("Description() = %q, want %q", got, "  Bob · ")
 	}
 }
 
