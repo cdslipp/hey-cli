@@ -29,8 +29,7 @@ Requires Go 1.26+. Use [mise](https://mise.jdx.dev) to install the correct versi
 
 ```bash
 mise install       # install Go 1.26
-make build         # build to ./bin/hey
-sudo install bin/hey /usr/local/bin/hey
+make install       # build and install into /usr/local/bin/hey
 ```
 
 ## Authentication

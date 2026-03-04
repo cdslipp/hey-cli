@@ -17,7 +17,7 @@ make build   # Builds the project into a binary located at ./bin/hey
 make test    # Runs the tests
 make lint    # Lints the code
 make clean   # Cleans the build artifacts
-make install # Installs the binary to /usr/local/bin/hey-cli or /usr/bin/hey-cli depending on the system
+make install # Installs the binary to /usr/local/bin/hey
 ```
 
 ## Architecture Overview
