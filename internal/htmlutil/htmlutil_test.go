@@ -1,0 +1,137 @@
+package htmlutil
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestToTextPlain(t *testing.T) {
+	got := ToText("hello world")
+	if got != "hello world" {
+		t.Errorf("ToText plain = %q, want %q", got, "hello world")
+	}
+}
+
+func TestToTextParagraphs(t *testing.T) {
+	got := ToText("<p>First</p><p>Second</p>")
+	if !strings.Contains(got, "First") || !strings.Contains(got, "Second") {
+		t.Errorf("ToText paragraphs = %q, should contain First and Second", got)
+	}
+}
+
+func TestToTextBr(t *testing.T) {
+	got := ToText("line1<br>line2")
+	if !strings.Contains(got, "line1\nline2") {
+		t.Errorf("ToText br = %q, should contain newline between lines", got)
+	}
+}
+
+func TestToTextList(t *testing.T) {
+	got := ToText("<ul><li>one</li><li>two</li></ul>")
+	if !strings.Contains(got, "• one") {
+		t.Errorf("ToText list = %q, should contain bullet items", got)
+	}
+	if !strings.Contains(got, "• two") {
+		t.Errorf("ToText list = %q, should contain second bullet", got)
+	}
+}
+
+func TestToTextStripsEntities(t *testing.T) {
+	got := ToText("&amp; &lt; &gt;")
+	if !strings.Contains(got, "& < >") {
+		t.Errorf("ToText entities = %q, should decode HTML entities", got)
+	}
+}
+
+func TestToTextStripsScript(t *testing.T) {
+	got := ToText("<p>hello</p><script>alert('xss')</script>")
+	if strings.Contains(got, "alert") {
+		t.Errorf("ToText should strip script content, got %q", got)
+	}
+}
+
+func TestToTextEmpty(t *testing.T) {
+	got := ToText("")
+	if got != "" {
+		t.Errorf("ToText empty = %q, want empty", got)
+	}
+}
+
+func TestToTextImgTag(t *testing.T) {
+	got := ToText(`<p>Before</p><img src="test.png" alt="photo"><p>After</p>`)
+	if !strings.Contains(got, "[photo]") {
+		t.Errorf("ToText should render img alt text, got %q", got)
+	}
+	if !strings.Contains(got, "Before") || !strings.Contains(got, "After") {
+		t.Errorf("ToText should include surrounding text, got %q", got)
+	}
+}
+
+func TestToTextImgNoAlt(t *testing.T) {
+	got := ToText(`<img src="test.png">`)
+	if !strings.Contains(got, "[image]") {
+		t.Errorf("ToText should show [image] for img without alt, got %q", got)
+	}
+}
+
+func TestToTextActionTextAttachment(t *testing.T) {
+	got := ToText(`<p>Text</p><action-text-attachment filename="photo.png"><img src="url"></action-text-attachment><p>More</p>`)
+	if !strings.Contains(got, "[photo.png]") {
+		t.Errorf("ToText should show filename for action-text-attachment, got %q", got)
+	}
+	if !strings.Contains(got, "Text") || !strings.Contains(got, "More") {
+		t.Errorf("ToText should include surrounding text, got %q", got)
+	}
+	if strings.Contains(got, "[image]") {
+		t.Errorf("ToText should skip inner content of action-text-attachment, got %q", got)
+	}
+}
+
+func TestToTextTrixFigure(t *testing.T) {
+	got := ToText(`<p>Before</p><figure data-trix-attachment='{"filename":"photo.png","url":"/img.png","contentType":"image/png"}'></figure><p>After</p>`)
+	if !strings.Contains(got, "[photo.png]") {
+		t.Errorf("ToText should show filename for trix figure, got %q", got)
+	}
+	if !strings.Contains(got, "Before") || !strings.Contains(got, "After") {
+		t.Errorf("ToText should include surrounding text, got %q", got)
+	}
+}
+
+func TestExtractImageURLs(t *testing.T) {
+	h := `<p>Hello</p><img src="https://example.com/a.png"><img src="https://example.com/b.jpg">`
+	urls := ExtractImageURLs(h)
+	if len(urls) != 2 {
+		t.Fatalf("ExtractImageURLs got %d urls, want 2", len(urls))
+	}
+	if urls[0] != "https://example.com/a.png" {
+		t.Errorf("url[0] = %q, want %q", urls[0], "https://example.com/a.png")
+	}
+	if urls[1] != "https://example.com/b.jpg" {
+		t.Errorf("url[1] = %q, want %q", urls[1], "https://example.com/b.jpg")
+	}
+}
+
+func TestExtractImageURLsNone(t *testing.T) {
+	urls := ExtractImageURLs("<p>No images here</p>")
+	if len(urls) != 0 {
+		t.Errorf("ExtractImageURLs got %d urls, want 0", len(urls))
+	}
+}
+
+func TestExtractImageURLsEmptySrc(t *testing.T) {
+	urls := ExtractImageURLs(`<img src="">`)
+	if len(urls) != 0 {
+		t.Errorf("ExtractImageURLs should skip empty src, got %d urls", len(urls))
+	}
+}
+
+func TestExtractImageURLsTrixFigure(t *testing.T) {
+	h := `<figure data-trix-attachment='{"url":"/rails/blobs/abc/image.png","filename":"image.png","contentType":"image/png"}'></figure>`
+	urls := ExtractImageURLs(h)
+	if len(urls) != 1 {
+		t.Fatalf("ExtractImageURLs trix got %d urls, want 1", len(urls))
+	}
+	if urls[0] != "/rails/blobs/abc/image.png" {
+		t.Errorf("url[0] = %q, want %q", urls[0], "/rails/blobs/abc/image.png")
+	}
+}

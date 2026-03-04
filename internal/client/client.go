@@ -51,6 +51,10 @@ func New(baseURL string, authMgr *auth.Manager) *Client {
 }
 
 func (c *Client) doRequest(method, path string, body io.Reader, contentType string) (*http.Response, error) {
+	return c.doRequestAccept(method, path, body, contentType, "application/json")
+}
+
+func (c *Client) doRequestAccept(method, path string, body io.Reader, contentType, accept string) (*http.Response, error) {
 	base := strings.TrimRight(c.BaseURL, "/")
 	reqURL := base + path
 
@@ -64,7 +68,7 @@ func (c *Client) doRequest(method, path string, body io.Reader, contentType stri
 		return nil, fmt.Errorf("authentication failed: %w", err)
 	}
 
-	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept", accept)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -90,6 +94,15 @@ func (c *Client) readBody(resp *http.Response) ([]byte, error) {
 
 func (c *Client) Get(path string) ([]byte, error) {
 	resp, err := c.doRequest("GET", path, nil, "")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return c.readBody(resp)
+}
+
+func (c *Client) GetHTML(path string) ([]byte, error) {
+	resp, err := c.doRequestAccept("GET", path, nil, "", "text/html")
 	if err != nil {
 		return nil, err
 	}

@@ -21,7 +21,7 @@ type calendarsModel struct {
 
 func newCalendarsModel() calendarsModel {
 	l := list.New(nil, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "Calendars  (Tab → Mail)"
+	l.Title = "Calendars  (Tab → Journal)"
 	l.SetShowStatusBar(false)
 	return calendarsModel{list: l}
 }

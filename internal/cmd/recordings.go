@@ -3,15 +3,16 @@ package cmd
 import (
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
 type recordingsCommand struct {
-	cmd   *cobra.Command
-	from  string
-	to    string
-	limit int
+	cmd      *cobra.Command
+	startsOn string
+	endsOn   string
+	limit    int
 }
 
 func newRecordingsCommand() *recordingsCommand {
@@ -20,14 +21,14 @@ func newRecordingsCommand() *recordingsCommand {
 		Use:   "recordings <calendar-id>",
 		Short: "List recordings (events, todos, etc.) for a calendar",
 		Example: `  hey recordings 123
-  hey recordings 123 --from 2024-01-01 --to 2024-01-31
+  hey recordings 123 --starts-on 2024-01-01 --ends-on 2024-01-31
   hey recordings 123 --limit 5 --json`,
 		RunE: recordingsCommand.run,
 		Args: cobra.ExactArgs(1),
 	}
 
-	recordingsCommand.cmd.Flags().StringVar(&recordingsCommand.from, "from", "", "Start date (YYYY-MM-DD)")
-	recordingsCommand.cmd.Flags().StringVar(&recordingsCommand.to, "to", "", "End date (YYYY-MM-DD)")
+	recordingsCommand.cmd.Flags().StringVar(&recordingsCommand.startsOn, "starts-on", "", "Start date (YYYY-MM-DD, defaults to today)")
+	recordingsCommand.cmd.Flags().StringVar(&recordingsCommand.endsOn, "ends-on", "", "End date (YYYY-MM-DD, defaults to 30 days from starts-on)")
 	recordingsCommand.cmd.Flags().IntVar(&recordingsCommand.limit, "limit", 0, "Maximum number of recordings per type to show")
 
 	return recordingsCommand
@@ -43,7 +44,20 @@ func (c *recordingsCommand) run(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid calendar ID: %s", args[0])
 	}
 
-	resp, err := apiClient.GetCalendarRecordings(calendarID, c.from, c.to)
+	startsOn := c.startsOn
+	if startsOn == "" {
+		startsOn = time.Now().Format("2006-01-02")
+	}
+	endsOn := c.endsOn
+	if endsOn == "" {
+		start, err := time.Parse("2006-01-02", startsOn)
+		if err != nil {
+			return fmt.Errorf("invalid starts-on date: %s", startsOn)
+		}
+		endsOn = start.AddDate(0, 0, 30).Format("2006-01-02")
+	}
+
+	resp, err := apiClient.GetCalendarRecordings(calendarID, startsOn, endsOn)
 	if err != nil {
 		return err
 	}

@@ -18,6 +18,7 @@ import (
 
 var (
 	jsonOutput bool
+	htmlOutput bool
 	baseURL    string
 	cfg        *config.Config
 	authMgr    *auth.Manager
@@ -71,6 +72,7 @@ func Execute() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output raw JSON")
+	rootCmd.PersistentFlags().BoolVar(&htmlOutput, "html", false, "Output raw HTML (for commands that return HTML content)")
 	rootCmd.PersistentFlags().StringVar(&baseURL, "base-url", "", "Override server URL")
 
 	rootCmd.AddCommand(newAuthCommand().cmd)

@@ -49,6 +49,24 @@ Configuration (base URL only) is stored in `~/.config/hey-cli/config.json`. Cred
 
 Remember to update the examples in the README when you change, add or remove CLI commands.
 
+### HTML content
+
+Some HEY API endpoints return 204 or incomplete data via JSON, but the full HTML content is available by scraping the edit page (e.g., `/calendar/days/{date}/journal_entry/edit` contains the Trix editor hidden input with full HTML). When an API endpoint returns incomplete data, check the corresponding web page for the full content. The `internal/htmlutil` package provides `ToText` (HTML→plain text) and `ExtractImageURLs` shared by both CLI and TUI. HEY uses Trix editor with `<figure data-trix-attachment="{...}">` for attachments — image URLs in those attributes are relative paths requiring authentication via `client.Get`.
+
+### Server implementation
+
+You can read through the server implementation to understand how the API works.
+The server code is located at ~/Work/basecamp/haystack/
+If you don't understand how the routes are laid out you can call rails routes in that directory to get a list of all the routes and their corresponding controller actions.
+
+### Testing
+
+Whenever you add, remove or change any functionality add/remove/change tests as well. Tests are located in the same package as the code they test, with filenames ending in `_test.go`. Run `make test` to run all tests.
+
+### Running
+
+To run the cli use `make build` and then `./bin/hey`. This ensures that you and I are running the same version of the program.
+
 ## Code style
 
 @STYLE.md

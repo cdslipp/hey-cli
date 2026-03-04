@@ -1,8 +1,13 @@
 package models
 
 type CalendarsResponse struct {
-	Calendars         []Calendar `json:"calendars"`
-	CalendarChangesURL string    `json:"calendar_changes_url"`
+	Calendars          []CalendarWrapper `json:"calendars"`
+	CalendarChangesURL string            `json:"calendar_changes_url"`
+}
+
+type CalendarWrapper struct {
+	Calendar           Calendar `json:"calendar"`
+	RecordingChangesURL string  `json:"recording_changes_url"`
 }
 
 type Calendar struct {
@@ -36,6 +41,7 @@ type Recording struct {
 	Calendar           *Calendar `json:"calendar,omitempty"`
 	RemindersLabel     string    `json:"reminders_label,omitempty"`
 	OccurrencesURL     string    `json:"occurrences_url,omitempty"`
+	Content            string    `json:"content,omitempty"`
 }
 
 type RecordingsResponse map[string][]Recording

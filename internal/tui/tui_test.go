@@ -709,9 +709,21 @@ func TestTabFromBoxesToCalendarsAlreadyLoaded(t *testing.T) {
 	}
 }
 
-func TestTabFromCalendarsToBoxes(t *testing.T) {
+func TestTabFromCalendarsToJournal(t *testing.T) {
 	m := modelWithCalendars()
 	m.state = viewCalendars
+	updated, _ := m.Update(keyPress("tab"))
+	result := updated.(model)
+
+	if result.state != viewJournal {
+		t.Errorf("state = %d, want viewJournal (%d)", result.state, viewJournal)
+	}
+}
+
+func TestTabFromJournalToBoxes(t *testing.T) {
+	m := modelWithCalendars()
+	m.state = viewJournal
+	m.journalLoaded = true
 	updated, _ := m.Update(keyPress("tab"))
 	result := updated.(model)
 
@@ -853,8 +865,8 @@ func TestCtrlCQuitsFromCalendar(t *testing.T) {
 
 func TestNewCalendarsModelTitle(t *testing.T) {
 	cm := newCalendarsModel()
-	if cm.list.Title != "Calendars  (Tab → Mail)" {
-		t.Errorf("calendars list title = %q, want %q", cm.list.Title, "Calendars  (Tab → Mail)")
+	if cm.list.Title != "Calendars  (Tab → Journal)" {
+		t.Errorf("calendars list title = %q, want %q", cm.list.Title, "Calendars  (Tab → Journal)")
 	}
 }
 
@@ -873,5 +885,167 @@ func TestViewShowsCalendars(t *testing.T) {
 	v := m.View()
 	if !strings.Contains(v.Content, "Calendars") {
 		t.Error("View should show calendars content when in viewCalendars state")
+	}
+}
+
+// --- Journal detail navigation ---
+
+func TestJournalDetailMsg(t *testing.T) {
+	m := sizedModel()
+	m.loading = true
+	m.state = viewJournal
+
+	updated, _ := m.Update(journalDetailMsg{title: "2025-03-01", body: "Hello world"})
+	result := updated.(model)
+
+	if result.loading {
+		t.Error("loading should be false after journalDetailMsg")
+	}
+	if result.state != viewJournalDetail {
+		t.Errorf("state = %d, want viewJournalDetail (%d)", result.state, viewJournalDetail)
+	}
+	if result.detail.title != "2025-03-01" {
+		t.Errorf("detail title = %q, want %q", result.detail.title, "2025-03-01")
+	}
+}
+
+func TestEscFromJournalDetailGoesBackToJournal(t *testing.T) {
+	m := sizedModel()
+	m.state = viewJournalDetail
+
+	updated, _ := m.Update(keyPress("esc"))
+	result := updated.(model)
+
+	if result.state != viewJournal {
+		t.Errorf("state after esc = %d, want viewJournal (%d)", result.state, viewJournal)
+	}
+}
+
+func TestBackspaceFromJournalDetailGoesBackToJournal(t *testing.T) {
+	m := sizedModel()
+	m.state = viewJournalDetail
+
+	updated, _ := m.Update(keyPress("backspace"))
+	result := updated.(model)
+
+	if result.state != viewJournal {
+		t.Errorf("state after backspace = %d, want viewJournal (%d)", result.state, viewJournal)
+	}
+}
+
+func TestQFromJournalDetailGoesBackToJournal(t *testing.T) {
+	m := sizedModel()
+	m.state = viewJournalDetail
+
+	updated, _ := m.Update(keyPress("q"))
+	result := updated.(model)
+
+	if result.state != viewJournal {
+		t.Errorf("state after q = %d, want viewJournal (%d)", result.state, viewJournal)
+	}
+}
+
+// --- Recording detail navigation ---
+
+func TestRecordingDetailMsg(t *testing.T) {
+	m := sizedModel()
+	m.loading = true
+	m.state = viewCalendar
+
+	updated, _ := m.Update(recordingDetailMsg{title: "Standup", body: "Starts: 2025-03-01T09:00"})
+	result := updated.(model)
+
+	if result.loading {
+		t.Error("loading should be false after recordingDetailMsg")
+	}
+	if result.state != viewRecordingDetail {
+		t.Errorf("state = %d, want viewRecordingDetail (%d)", result.state, viewRecordingDetail)
+	}
+	if result.detail.title != "Standup" {
+		t.Errorf("detail title = %q, want %q", result.detail.title, "Standup")
+	}
+}
+
+func TestEscFromRecordingDetailGoesBackToCalendar(t *testing.T) {
+	m := sizedModel()
+	m.state = viewRecordingDetail
+
+	updated, _ := m.Update(keyPress("esc"))
+	result := updated.(model)
+
+	if result.state != viewCalendar {
+		t.Errorf("state after esc = %d, want viewCalendar (%d)", result.state, viewCalendar)
+	}
+}
+
+func TestBackspaceFromRecordingDetailGoesBackToCalendar(t *testing.T) {
+	m := sizedModel()
+	m.state = viewRecordingDetail
+
+	updated, _ := m.Update(keyPress("backspace"))
+	result := updated.(model)
+
+	if result.state != viewCalendar {
+		t.Errorf("state after backspace = %d, want viewCalendar (%d)", result.state, viewCalendar)
+	}
+}
+
+func TestQFromRecordingDetailGoesBackToCalendar(t *testing.T) {
+	m := sizedModel()
+	m.state = viewRecordingDetail
+
+	updated, _ := m.Update(keyPress("q"))
+	result := updated.(model)
+
+	if result.state != viewCalendar {
+		t.Errorf("state after q = %d, want viewCalendar (%d)", result.state, viewCalendar)
+	}
+}
+
+func TestCtrlCQuitsFromJournalDetail(t *testing.T) {
+	m := sizedModel()
+	m.state = viewJournalDetail
+	_, cmd := m.Update(keyPress("ctrl+c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should return a quit cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("ctrl+c cmd produced %T, want tea.QuitMsg", msg)
+	}
+}
+
+func TestCtrlCQuitsFromRecordingDetail(t *testing.T) {
+	m := sizedModel()
+	m.state = viewRecordingDetail
+	_, cmd := m.Update(keyPress("ctrl+c"))
+	if cmd == nil {
+		t.Fatal("ctrl+c should return a quit cmd")
+	}
+	msg := cmd()
+	if _, ok := msg.(tea.QuitMsg); !ok {
+		t.Errorf("ctrl+c cmd produced %T, want tea.QuitMsg", msg)
+	}
+}
+
+// --- Detail view rendering ---
+
+func TestViewShowsJournalDetail(t *testing.T) {
+	m := sizedModel()
+	m.detail.setContent("2025-03-01", "My journal entry text")
+	m.state = viewJournalDetail
+	v := m.View()
+	if !strings.Contains(v.Content, "2025-03-01") {
+		t.Error("View should show journal detail title")
+	}
+}
+
+func TestViewShowsRecordingDetail(t *testing.T) {
+	m := sizedModel()
+	m.detail.setContent("Standup", "Starts: 2025-03-01T09:00")
+	m.state = viewRecordingDetail
+	v := m.View()
+	if !strings.Contains(v.Content, "Standup") {
+		t.Error("View should show recording detail title")
 	}
 }

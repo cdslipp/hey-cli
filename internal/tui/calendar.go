@@ -80,3 +80,12 @@ func (m calendarModel) update(msg tea.Msg) (calendarModel, tea.Cmd) {
 func (m calendarModel) view() string {
 	return m.list.View()
 }
+
+func (m calendarModel) selectedRecording() *models.Recording {
+	item := m.list.SelectedItem()
+	if item == nil {
+		return nil
+	}
+	ri := item.(recordingItem)
+	return &ri.recording
+}

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"hey-cli/internal/editor"
+	"hey-cli/internal/htmlutil"
 )
 
 type journalCommand struct {
@@ -95,6 +96,7 @@ func newJournalReadCommand() *journalReadCommand {
 		Short: "Read a journal entry (default: today)",
 		Example: `  hey journal read
   hey journal read 2024-01-15
+  hey journal read --html
   hey journal read --json`,
 		RunE: journalReadCommand.run,
 		Args: cobra.MaximumNArgs(1),
@@ -122,9 +124,14 @@ func (c *journalReadCommand) run(cmd *cobra.Command, args []string) error {
 		return printJSON(entry)
 	}
 
+	if htmlOutput {
+		fmt.Println(entry.Body)
+		return nil
+	}
+
 	fmt.Printf("Journal — %s\n\n", date)
 	if entry.Body != "" {
-		fmt.Println(entry.Body)
+		fmt.Println(htmlutil.ToText(entry.Body))
 	} else {
 		fmt.Println("(empty)")
 	}
