@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/basecamp/hey-cli/internal/output"
 	"github.com/mattn/go-runewidth"
 	"golang.org/x/term"
 )
@@ -19,12 +20,14 @@ func init() {
 }
 
 type table struct {
+	w            io.Writer
 	columnWidths map[int]int
 	rows         [][]string
 }
 
-func newTable() *table {
+func newTable(w io.Writer) *table {
 	return &table{
+		w:            w,
 		columnWidths: map[int]int{},
 		rows:         [][]string{},
 	}
@@ -47,9 +50,9 @@ func (t *table) print() {
 			}
 
 			pad := max(t.columnWidths[i]-runewidth.StringWidth(cell), 0)
-			fmt.Printf("%s%s  ", cellStyle.format(cell), strings.Repeat(" ", pad))
+			fmt.Fprintf(t.w, "%s%s  ", cellStyle.format(cell), strings.Repeat(" ", pad))
 		}
-		fmt.Println()
+		fmt.Fprintln(t.w)
 	}
 }
 
@@ -77,24 +80,6 @@ func (s style) format(value string) string {
 	return "\033[" + string(s) + "m" + value + "\033[0m"
 }
 
-func printJSON(v any) error {
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
-}
-
-func printRawJSON(data []byte) error {
-	var v any
-	if err := json.Unmarshal(data, &v); err != nil {
-		_, _ = os.Stdout.Write(data)
-		fmt.Println()
-		return nil //nolint:nilerr // fallback to raw output when JSON is invalid
-	}
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	return enc.Encode(v)
-}
-
 func truncate(s string, maxWidth int) string {
 	if runewidth.StringWidth(s) <= maxWidth {
 		return s
@@ -106,10 +91,14 @@ func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd())) //nolint:gosec // G115: fd fits in int
 }
 
+func stdoutIsTerminal() bool {
+	return term.IsTerminal(int(os.Stdout.Fd())) //nolint:gosec // G115: fd fits in int
+}
+
 func readStdin() (string, error) {
 	data, err := io.ReadAll(os.Stdin)
 	if err != nil {
-		return "", fmt.Errorf("could not read from stdin: %w", err)
+		return "", output.ErrUsage(fmt.Sprintf("could not read from stdin: %v", err))
 	}
 	return strings.TrimSpace(string(data)), nil
 }

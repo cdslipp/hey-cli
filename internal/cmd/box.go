@@ -9,11 +9,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/basecamp/hey-cli/internal/models"
+	"github.com/basecamp/hey-cli/internal/output"
 )
 
 type boxCommand struct {
 	cmd   *cobra.Command
 	limit int
+	all   bool
 }
 
 func newBoxCommand() *boxCommand {
@@ -22,6 +24,9 @@ func newBoxCommand() *boxCommand {
 		Use:   "box <name|id>",
 		Short: "List postings in a mailbox",
 		Long:  "List postings in a mailbox. Accepts a box name (imbox, feedbox, etc.) or numeric ID.",
+		Annotations: map[string]string{
+			"agent_notes": "Accepts box name or numeric ID. Returns postings (threads). Use topic IDs with hey topic.",
+		},
 		Example: `  hey box imbox
   hey box imbox --limit 10
   hey box 123 --json`,
@@ -30,6 +35,7 @@ func newBoxCommand() *boxCommand {
 	}
 
 	boxCommand.cmd.Flags().IntVar(&boxCommand.limit, "limit", 0, "Maximum number of postings to show")
+	boxCommand.cmd.Flags().BoolVar(&boxCommand.all, "all", false, "Fetch all results (override --limit)")
 
 	return boxCommand
 }
@@ -50,36 +56,56 @@ func (c *boxCommand) run(cmd *cobra.Command, args []string) error {
 	}
 
 	postings := resp.Postings
-	if c.limit > 0 && len(postings) > c.limit {
+	total := len(postings)
+	if c.limit > 0 && !c.all && len(postings) > c.limit {
 		postings = postings[:c.limit]
 	}
+	notice := output.TruncationNotice(len(postings), total)
 
-	if jsonOutput {
-		resp.Postings = postings
-		return printJSON(resp)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Box: %s (%s)\n\n", resp.Box.Name, resp.Box.Kind)
+
+		table := newTable(cmd.OutOrStdout())
+		table.addRow([]string{"Topic", "From", "Summary", "Date"})
+		for _, raw := range postings {
+			var p models.Posting
+			if err := json.Unmarshal(raw, &p); err != nil {
+				continue
+			}
+			date := ""
+			if len(p.CreatedAt) >= 10 {
+				date = p.CreatedAt[:10]
+			}
+			displayID := p.ID
+			if tid := p.ResolveTopicID(); tid != 0 {
+				displayID = tid
+			}
+			table.addRow([]string{fmt.Sprintf("%d", displayID), p.Creator.Name, truncate(p.Summary, 60), date})
+		}
+		table.print()
+		if notice != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), notice)
+		}
+		return nil
 	}
 
-	fmt.Printf("Box: %s (%s)\n\n", resp.Box.Name, resp.Box.Kind)
-
-	table := newTable()
-	table.addRow([]string{"Topic", "From", "Summary", "Date"})
-	for _, raw := range postings {
-		var p models.Posting
-		if err := json.Unmarshal(raw, &p); err != nil {
-			continue
-		}
-		date := ""
-		if len(p.CreatedAt) >= 10 {
-			date = p.CreatedAt[:10]
-		}
-		displayID := p.ID
-		if tid := p.ResolveTopicID(); tid != 0 {
-			displayID = tid
-		}
-		table.addRow([]string{fmt.Sprintf("%d", displayID), p.Creator.Name, truncate(p.Summary, 60), date})
-	}
-	table.print()
-	return nil
+	resp.Postings = postings
+	return writeOK(resp,
+		output.WithSummary(fmt.Sprintf("%d postings in %s", len(postings), resp.Box.Name)),
+		output.WithNotice(notice),
+		output.WithBreadcrumbs(
+			output.Breadcrumb{
+				Action:      "read",
+				Command:     "hey topic <id>",
+				Description: "Read an email thread",
+			},
+			output.Breadcrumb{
+				Action:      "compose",
+				Command:     "hey compose --to <email> --subject <subject>",
+				Description: "Compose a new message",
+			},
+		),
+	)
 }
 
 func (c *boxCommand) resolveBoxID(nameOrID string) (int, error) {
@@ -89,7 +115,7 @@ func (c *boxCommand) resolveBoxID(nameOrID string) (int, error) {
 
 	boxes, err := apiClient.ListBoxes()
 	if err != nil {
-		return 0, fmt.Errorf("could not list boxes: %w", err)
+		return 0, err
 	}
 
 	nameOrID = strings.ToLower(nameOrID)
@@ -99,5 +125,5 @@ func (c *boxCommand) resolveBoxID(nameOrID string) (int, error) {
 		}
 	}
 
-	return 0, fmt.Errorf("box %q not found", nameOrID)
+	return 0, output.ErrNotFound("box", nameOrID)
 }

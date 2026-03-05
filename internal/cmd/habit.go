@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/basecamp/hey-cli/internal/output"
 )
 
 type habitCommand struct {
@@ -16,6 +18,9 @@ func newHabitCommand() *habitCommand {
 	habitCommand.cmd = &cobra.Command{
 		Use:   "habit",
 		Short: "Manage habit completions",
+		Annotations: map[string]string{
+			"agent_notes": "Subcommands: complete, uncomplete. Requires habit ID from calendar recordings.",
+		},
 	}
 
 	habitCommand.cmd.AddCommand(newHabitCompleteCommand().cmd)
@@ -62,12 +67,16 @@ func (c *habitCompleteCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Habit %s completed for %s.%s\n", args[0], date, extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Habit %s completed for %s.%s\n", args[0], date, extractMutationInfo(data))
-	return nil
+	normalized, nerr := output.NormalizeJSONNumbers(data)
+	if nerr != nil {
+		return writeOK(nil, output.WithSummary(fmt.Sprintf("Habit %s completed for %s", args[0], date)))
+	}
+	return writeOK(normalized, output.WithSummary(fmt.Sprintf("Habit %s completed for %s", args[0], date)))
 }
 
 // uncomplete
@@ -108,10 +117,14 @@ func (c *habitUncompleteCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Habit %s uncompleted for %s.%s\n", args[0], date, extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Habit %s uncompleted for %s.%s\n", args[0], date, extractMutationInfo(data))
-	return nil
+	normalized, nerr := output.NormalizeJSONNumbers(data)
+	if nerr != nil {
+		return writeOK(nil, output.WithSummary(fmt.Sprintf("Habit %s uncompleted for %s", args[0], date)))
+	}
+	return writeOK(normalized, output.WithSummary(fmt.Sprintf("Habit %s uncompleted for %s", args[0], date)))
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/basecamp/hey-cli/internal/output"
 )
 
 type todoCommand struct {
@@ -15,6 +17,9 @@ func newTodoCommand() *todoCommand {
 	todoCommand.cmd = &cobra.Command{
 		Use:   "todo",
 		Short: "Manage todos",
+		Annotations: map[string]string{
+			"agent_notes": "Subcommands: list, add, complete, uncomplete, delete. Use list --ids-only to pipe IDs to complete/delete.",
+		},
 	}
 
 	todoCommand.cmd.AddCommand(newTodoListCommand().cmd)
@@ -31,6 +36,7 @@ func newTodoCommand() *todoCommand {
 type todoListCommand struct {
 	cmd   *cobra.Command
 	limit int
+	all   bool
 }
 
 func newTodoListCommand() *todoListCommand {
@@ -45,6 +51,7 @@ func newTodoListCommand() *todoListCommand {
 	}
 
 	todoListCommand.cmd.Flags().IntVar(&todoListCommand.limit, "limit", 0, "Maximum number of todos to show")
+	todoListCommand.cmd.Flags().BoolVar(&todoListCommand.all, "all", false, "Fetch all results (override --limit)")
 
 	return todoListCommand
 }
@@ -59,34 +66,54 @@ func (c *todoListCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if c.limit > 0 && len(todos) > c.limit {
+	total := len(todos)
+	if c.limit > 0 && !c.all && len(todos) > c.limit {
 		todos = todos[:c.limit]
 	}
+	notice := output.TruncationNotice(len(todos), total)
 
-	if jsonOutput {
-		return printJSON(todos)
-	}
+	if writer.IsStyled() {
+		if len(todos) == 0 {
+			fmt.Fprintln(cmd.OutOrStdout(), "No todos.")
+			return nil
+		}
 
-	if len(todos) == 0 {
-		fmt.Println("No todos.")
+		table := newTable(cmd.OutOrStdout())
+		table.addRow([]string{"ID", "Title", "Date", "Done"})
+		for _, t := range todos {
+			date := ""
+			if len(t.StartsAt) >= 10 {
+				date = t.StartsAt[:10]
+			}
+			done := ""
+			if t.CompletedAt != "" {
+				done = "yes"
+			}
+			table.addRow([]string{fmt.Sprintf("%d", t.ID), t.Title, date, done})
+		}
+		table.print()
+		if notice != "" {
+			fmt.Fprintln(cmd.OutOrStdout(), notice)
+		}
 		return nil
 	}
 
-	table := newTable()
-	table.addRow([]string{"ID", "Title", "Date", "Done"})
-	for _, t := range todos {
-		date := ""
-		if len(t.StartsAt) >= 10 {
-			date = t.StartsAt[:10]
-		}
-		done := ""
-		if t.CompletedAt != "" {
-			done = "yes"
-		}
-		table.addRow([]string{fmt.Sprintf("%d", t.ID), t.Title, date, done})
-	}
-	table.print()
-	return nil
+	return writeOK(todos,
+		output.WithSummary(fmt.Sprintf("%d todos", len(todos))),
+		output.WithNotice(notice),
+		output.WithBreadcrumbs(
+			output.Breadcrumb{
+				Action:      "add",
+				Command:     "hey todo add --title '...'",
+				Description: "Add a new todo",
+			},
+			output.Breadcrumb{
+				Action:      "complete",
+				Command:     "hey todo complete <id>",
+				Description: "Mark a todo as complete",
+			},
+		),
+	)
 }
 
 // add
@@ -120,7 +147,7 @@ func (c *todoAddCommand) run(cmd *cobra.Command, args []string) error {
 	}
 
 	if c.title == "" {
-		return fmt.Errorf("--title is required")
+		return output.ErrUsageHint("--title is required", "hey todo add --title 'Buy groceries'")
 	}
 
 	body := map[string]any{"title": c.title}
@@ -133,12 +160,16 @@ func (c *todoAddCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Todo created.%s\n", extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Todo created.%s\n", extractMutationInfo(data))
-	return nil
+	normalized, err := output.NormalizeJSONNumbers(data)
+	if err != nil {
+		return writeOK(nil, output.WithSummary("Todo created"))
+	}
+	return writeOK(normalized, output.WithSummary("Todo created"))
 }
 
 // complete
@@ -170,12 +201,16 @@ func (c *todoCompleteCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Todo completed.%s\n", extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Todo completed.%s\n", extractMutationInfo(data))
-	return nil
+	normalized, err := output.NormalizeJSONNumbers(data)
+	if err != nil {
+		return writeOK(nil, output.WithSummary("Todo completed"))
+	}
+	return writeOK(normalized, output.WithSummary("Todo completed"))
 }
 
 // uncomplete
@@ -207,12 +242,16 @@ func (c *todoUncompleteCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Todo marked incomplete.%s\n", extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Todo marked incomplete.%s\n", extractMutationInfo(data))
-	return nil
+	normalized, err := output.NormalizeJSONNumbers(data)
+	if err != nil {
+		return writeOK(nil, output.WithSummary("Todo marked incomplete"))
+	}
+	return writeOK(normalized, output.WithSummary("Todo marked incomplete"))
 }
 
 // delete
@@ -244,10 +283,14 @@ func (c *todoDeleteCommand) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if jsonOutput {
-		return printRawJSON(data)
+	if writer.IsStyled() {
+		fmt.Fprintf(cmd.OutOrStdout(), "Todo deleted.%s\n", extractMutationInfo(data))
+		return nil
 	}
 
-	fmt.Printf("Todo deleted.%s\n", extractMutationInfo(data))
-	return nil
+	normalized, err := output.NormalizeJSONNumbers(data)
+	if err != nil {
+		return writeOK(nil, output.WithSummary("Todo deleted"))
+	}
+	return writeOK(normalized, output.WithSummary("Todo deleted"))
 }
