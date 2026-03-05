@@ -1,26 +1,44 @@
-#!/bin/bash
-# Emits current hey-cli context for agent sessions
+#!/usr/bin/env bash
+# session-start.sh - HEY plugin liveness check
 set -euo pipefail
 
-echo "=== HEY CLI Status ==="
-
-if command -v hey &>/dev/null; then
-  echo "Binary: $(command -v hey)"
-  hey --version 2>/dev/null || echo "Version: unknown"
-else
-  echo "Binary: not found in PATH"
+if ! command -v hey &>/dev/null; then
+  cat << 'EOF'
+<hook-output>
+HEY plugin active — CLI not found on PATH.
+Install: https://github.com/basecamp/hey-cli#installation
+</hook-output>
+EOF
   exit 0
 fi
 
-echo ""
-echo "=== Authentication ==="
-hey auth status 2>/dev/null || echo "Auth: unavailable"
+auth_json=$(hey auth status --json 2>/dev/null || echo '{}')
 
-echo ""
-echo "=== Configuration ==="
-echo "Config dir: ${XDG_CONFIG_HOME:-$HOME/.config}/hey-cli"
-if [ -f "${XDG_CONFIG_HOME:-$HOME/.config}/hey-cli/config.json" ]; then
-  cat "${XDG_CONFIG_HOME:-$HOME/.config}/hey-cli/config.json"
+if ! command -v jq &>/dev/null; then
+  cat << 'EOF'
+<hook-output>
+HEY plugin active.
+</hook-output>
+EOF
+  exit 0
+fi
+
+is_auth=false
+if parsed_auth=$(echo "$auth_json" | jq -er '.data.authenticated' 2>/dev/null); then
+  is_auth="$parsed_auth"
+fi
+
+if [[ "$is_auth" == "true" ]]; then
+  cat << 'EOF'
+<hook-output>
+HEY plugin active.
+</hook-output>
+EOF
 else
-  echo "No config file found (using defaults)"
+  cat << 'EOF'
+<hook-output>
+HEY plugin active — not authenticated.
+Run: hey auth login
+</hook-output>
+EOF
 fi
