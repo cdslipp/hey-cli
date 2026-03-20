@@ -9,19 +9,19 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
-permissions:
-  contents: write
-  attestations: write
-  security-events: write
-  pull-requests: read
-  models: read
+permissions: {}
 
 jobs:
   test:
     uses: ./.github/workflows/test.yml
+    permissions:
+      contents: read
 
   security:
     uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
 
   release:
     name: Release
@@ -35,12 +35,13 @@ jobs:
       attestations: write
       models: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Go
-        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6
+        uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0 # zizmor: ignore[cache-poisoning] -- cache is branch-isolated; fork PRs cannot write to this cache
         with:
           go-version-file: go.mod
 
@@ -62,7 +63,7 @@ jobs:
               failed=$((failed + 1))
             fi
           done
-          rm -f *.test
+          rm -f ./*.test
           if [ "$failed" -gt 0 ]; then
             echo "WARNING: $failed package(s) failed benchmarking — PGO profile may be incomplete"
           fi
@@ -77,7 +78,7 @@ jobs:
         uses: sigstore/cosign-installer@ba7bc0a3fef59531c69a25acd34668d6d3fe6f22 # v4.1.0
 
       - name: Install Syft
-        uses: anchore/sbom-action/download-syft@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0
+        uses: anchore/sbom-action/download-syft@57aae528053a48a3f6235f2d9461b05fbcb7366d # v0.23.1
 
       - name: Generate shell completions
         run: |
@@ -171,7 +172,7 @@ jobs:
 
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -179,7 +180,7 @@ jobs:
           permission-contents: write
 
       - name: Install GoReleaser
-        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7
+        uses: goreleaser/goreleaser-action@ec59f474b9834571250b370d4735c50f8e2d1e29 # v7.0.0
         with:
           version: 'v2.14.1'
           install-only: true
@@ -242,7 +243,9 @@ jobs:
       contents: read
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Check AUR secret
         id: check
@@ -274,11 +277,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: Generate token for skills repo
         id: skills-token
-        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v2
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
         with:
           app-id: ${{ vars.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
